@@ -1,17 +1,19 @@
 # Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-#!/usr/bin/env python
+# !/usr/bin/env python
 # -*- coding: utf-8 -*-
 # File: train.py
 
 import argparse
 import itertools
-import numpy as np
 import shutil
+
 import cv2
+import numpy as np
 import six
-assert six.PY3, "FasterRCNN requires Python 3!"
-import tensorflow as tf
+
+from data_prepare.coco_format import COCOFormatDataLoader
+
 import tqdm
 import time
 import subprocess
@@ -19,28 +21,31 @@ import subprocess
 import tensorpack.utils.viz as tpviz
 from tensorpack import *
 from tensorpack.tfutils.common import get_tf_version_tuple
-
+from tensorpack.utils import logger
 
 from dataset import DetectionDataset
 from config import finalize_configs, config as cfg
-from data import get_eval_dataflow, get_train_dataflow, get_batch_train_dataflow
+from data_pearlii import get_eval_dataflow, get_train_dataflow, get_batch_train_dataflow
 from eval import DetectionResult, predict_image, multithread_predict_dataflow, EvalCallback, AsyncEvalCallback
 from viz import draw_annotation, draw_final_outputs, draw_predictions, draw_proposal_recall
 from performance import ThroughputTracker, humanize_float
 from model.generalized_rcnn import ResNetFPNModel
 from tensorpack.utils import fix_rng_seed
+import tensorflow as tf
 
+assert six.PY3, "FasterRCNN requires Python 3!"
 
 try:
     import horovod.tensorflow as hvd
 except ImportError:
     pass
 
+
 def do_visualize(model, model_path, nr_visualize=100, output_dir='output'):
     """
     Visualize some intermediate results (proposals, raw predictions) inside the pipeline.
     """
-    df = get_train_dataflow()   # we don't visualize mask stuff
+    df = get_train_dataflow()  # we don't visualize mask stuff
     df.reset_state()
 
     pred = OfflinePredictor(PredictConfig(
@@ -64,7 +69,7 @@ def do_visualize(model, model_path, nr_visualize=100, output_dir='output'):
             img, gt_boxes, gt_labels = dp['images'], dp['gt_boxes'], dp['gt_labels']
 
             rpn_boxes, rpn_scores, all_scores, \
-                final_boxes, final_scores, final_labels = pred(img, gt_boxes, gt_labels)
+            final_boxes, final_scores, final_labels = pred(img, gt_boxes, gt_labels)
 
             # draw groundtruth boxes
             gt_viz = draw_annotation(img, gt_boxes, gt_labels)
@@ -113,21 +118,19 @@ def do_predict(pred_func, input_file):
     tpviz.interactive_imshow(viz)
 
 
-
-
-
 def log_launch_config(log_full_git_diff):
     def check_and_log(cmd):
         logger.info(cmd)
         logger.info(subprocess.check_output(cmd, shell=True).decode("utf-8"))
 
-    check_and_log('git status') # branch and changes
-    check_and_log('git rev-parse HEAD') # commit
+    check_and_log('git status')  # branch and changes
+    check_and_log('git rev-parse HEAD')  # commit
     if log_full_git_diff:
         check_and_log('git diff')
 
     check_and_log('env')
     check_and_log('ps -elf | grep mpirun')
+
 
 def call_only_once(func):
     """
@@ -166,10 +169,12 @@ def call_only_once(func):
 
     return wrapper
 
+
 class AsyncHorovodTrainer(HorovodTrainer):
     '''
     A wrapper of the HorovodTrainer, will stop the training once the target accuracy is reached.
     '''
+
     def __init__(self, average=True, compression=None):
         super(AsyncHorovodTrainer, self).__init__(average=average, compression=compression)
 
@@ -219,9 +224,57 @@ class AsyncHorovodTrainer(HorovodTrainer):
                 self.hooked_sess.close()
 
 
+"""
+python3 /mask-rcnn-tensorflow/MaskRCNN/train.py \
+--logdir /logs/train_log \
+--fp16 \
+--throughput_log_freq ${THROUGHPUT_LOG_FREQ} \
+--config \
+MODE_MASK=True \
+MODE_FPN=True \
+DATA.BASEDIR=/data \
+DATA.TRAIN='["train2017"]' \
+DATA.VAL='("val2017",)' \
+TRAIN.BATCH_SIZE_PER_GPU=${BATCH_SIZE_PER_GPU} \
+TRAIN.LR_EPOCH_SCHEDULE='[(8, 0.1), (10, 0.01), (12, None)]' \
+TRAIN.EVAL_PERIOD=24 \
+TRAIN.BACKBONE_NCHW=False \
+TRAIN.FPN_NCHW=False \
+TRAIN.RPN_NCHW=False \
+TRAIN.MASK_NCHW=False \
+RPN.TOPK_PER_IMAGE=True \
+PREPROC.PREDEFINED_PADDING=False \
+BACKBONE.WEIGHTS=/data/pretrained-models/ImageNet-R50-AlignPadding.npz \
+BACKBONE.NORM=FreezeBN \
+TRAIN.WARMUP_INIT_LR=0.000416666666667 \
+FRCNN.BBOX_REG_WEIGHTS='[20., 20., 10., 10.]' \
+TRAINER=horovod
+"""
+
+import os
+def set_config_default():
+    cfg.DATA.BASEDIR = os.path.abspath('../../')
+
+    data_load = COCOFormatDataLoader(project_root_dir=cfg.DATA.BASEDIR,
+                                     coco_dir='data/coco_format')
+    _latest = data_load.latest()
+    latest_coco = next(_latest)
+    print('Backbone ---', cfg.BACKBONE.WEIGHTS)
+    input('Continue?')
+    # curl -O http://models.tensorpack.com/FasterRCNN/ImageNet-R50-AlignPadding.npz
+    cfg.BACKBONE.WEIGHTS ='/data/pretrained-models/ImageNet-R50-AlignPadding.npz'
+    cfg.DATA.TRAIN = latest_coco['train']
+    # cfg.DATA.EEEEE = latest_coco['train']
+    raise ('CNT tmr set TENSORPACK_FP16=1')
+
+    print(latest_coco)
 
 
 if __name__ == '__main__':
+
+    set_config_default()
+    # exit()
+
     start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--load', help='load a model for evaluation or training. Can overwrite BACKBONE.WEIGHTS')
@@ -233,24 +286,27 @@ if __name__ == '__main__':
                                           "This argument is the path to the input image file")
     parser.add_argument('--config', help="A list of KEY=VALUE to overwrite those defined in config.py",
                         nargs='+')
-    parser.add_argument('--fp16', help="Train in FP16", action="store_true")
-    parser.add_argument('--async_eval', help="Enable async evaluation, for mlperf. Evaluation will run every epoch and training will be stopped once the target is hit", action="store_true")
+    parser.add_argument('--fp16', help="Train in FP16", action="store_true", default=True)
+    parser.add_argument('--async_eval',
+                        help="Enable async evaluation, for mlperf. Evaluation will run every epoch and training will be stopped once the target is hit",
+                        action="store_true")
     #################################################################################################################
     # Performance investigation arguments
-    parser.add_argument('--throughput_log_freq', help="In perf investigation mode, code will print throughput after every throughput_log_freq steps as well as after every epoch", type=int, default=100)
-    parser.add_argument('--images_per_epoch', help="Number of images in an epoch. = images_per_steps * steps_per_epoch (differs slightly from the total number of images).", type=int, default=120000)
+    parser.add_argument('--throughput_log_freq',
+                        help="In perf investigation mode, code will print throughput after every throughput_log_freq steps as well as after every epoch",
+                        type=int, default=100)
+    parser.add_argument('--images_per_epoch',
+                        help="Number of images in an epoch. = images_per_steps * steps_per_epoch (differs slightly from the total number of images).",
+                        type=int, default=120000)
 
     parser.add_argument('--tfprof', help="Enable tf profiler", action="store_true")
     parser.add_argument('--tfprof_start_step', help="Step to enable tf profiling", type=int, default=15005)
-    parser.add_argument('--tfprof_end_step', help="Step after which tf profiling will be disabled", type=int, default=15010)
+    parser.add_argument('--tfprof_end_step', help="Step after which tf profiling will be disabled", type=int,
+                        default=15010)
 
     parser.add_argument('--log_full_git_diff', help="Log the full git diff", action="store_false")
 
-
     #################################################################################################################
-
-
-
 
     if get_tf_version_tuple() < (1, 6):
         # https://github.com/tensorflow/tensorflow/issues/14657
@@ -259,11 +315,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.config:
         cfg.update_args(args.config)
-
+    print(args.fp16)
+    input('continue?')
     MODEL = ResNetFPNModel(args.fp16)
     DetectionDataset()  # initialize the config with information from our dataset
-
-
 
     if args.visualize or args.evaluate or args.predict:
         assert tf.test.is_gpu_available()
@@ -287,10 +342,7 @@ if __name__ == '__main__':
                 assert args.evaluate.endswith('.json'), args.evaluate
                 do_evaluate(predcfg, args.evaluate)
 
-
-
     else:
-
         is_horovod = cfg.TRAINER == 'horovod'
         if args.async_eval:
             assert is_horovod, "Async evaluation only support Horovod based trainer"
@@ -301,7 +353,7 @@ if __name__ == '__main__':
 
         if not is_horovod or hvd.rank() == 0:
             logger.set_logger_dir(args.logdir, 'd')
-            log_launch_config(args.log_full_git_diff)
+            # log_launch_config(args.log_full_git_diff)
 
         finalize_configs(is_training=True)
 
@@ -311,44 +363,40 @@ if __name__ == '__main__':
 
         if cfg.TRAIN.SEED:
             tf.set_random_seed(cfg.TRAIN.SEED)
-            fix_rng_seed(cfg.TRAIN.SEED*hvd.rank())
+            if is_horovod:
+                fix_rng_seed(cfg.TRAIN.SEED * hvd.rank())
             np.random.seed(cfg.TRAIN.SEED)
 
         images_per_step = cfg.TRAIN.NUM_GPUS * cfg.TRAIN.BATCH_SIZE_PER_GPU
         steps_per_epoch = args.images_per_epoch // images_per_step
-        batch_size_lr_factor = images_per_step # The LR is defined for bs=1 and then scaled linearly with the batch size
+        batch_size_lr_factor = images_per_step  # The LR is defined for bs=1 and then scaled linearly with the batch size
         base_lr_adjusted_for_bs = cfg.TRAIN.BASE_LR * batch_size_lr_factor
 
         # Warmup LR schedule is step based
         warmup_start_step = 0
         warmup_end_step = cfg.TRAIN.WARMUP_STEPS
-        warmup_start_lr = cfg.TRAIN.WARMUP_INIT_LR*8
+        warmup_start_lr = cfg.TRAIN.WARMUP_INIT_LR * 8
         warmup_end_lr = base_lr_adjusted_for_bs
         warmup_schedule = [(warmup_start_step, warmup_start_lr), (warmup_end_step, warmup_end_lr)]
-
 
         # Training LR schedule is epoch based
         warmup_end_epoch = cfg.TRAIN.WARMUP_STEPS * 1. / steps_per_epoch
         training_start_epoch = int(warmup_end_epoch + 0.5)
         lr_schedule = [(training_start_epoch, base_lr_adjusted_for_bs)]
 
-
         max_epoch = None
         for epoch, scheduled_lr_multiplier in cfg.TRAIN.LR_EPOCH_SCHEDULE:
             if scheduled_lr_multiplier is None:
-                max_epoch = epoch # Training end is indicated by a lr_multiplier of None
+                max_epoch = epoch  # Training end is indicated by a lr_multiplier of None
                 break
 
             absolute_lr = base_lr_adjusted_for_bs * scheduled_lr_multiplier
             lr_schedule.append((epoch, absolute_lr))
 
-
         logger.info("Warm Up Schedule (steps, value): " + str(warmup_schedule))
         logger.info("LR Schedule (epochs, value): " + str(lr_schedule))
 
-
         train_dataflow = get_batch_train_dataflow(cfg.TRAIN.BATCH_SIZE_PER_GPU)
-
 
         callbacks = [
             PeriodicCallback(
@@ -360,24 +408,26 @@ if __name__ == '__main__':
             ScheduledHyperParamSetter('learning_rate', lr_schedule),
             PeakMemoryTracker(),
             EstimatedTimeLeft(median=True),
-            SessionRunTimeout(60000).set_chief_only(True),   # 1 minute timeout
+            SessionRunTimeout(60000).set_chief_only(True),  # 1 minute timeout
         ]
 
         if args.async_eval:
             callbacks.extend([
-                AsyncEvalCallback(dataset, *MODEL.get_inference_tensor_names(), args.logdir, 1) #cfg.TRAIN.BATCH_SIZE_PER_GPU)
+                AsyncEvalCallback(dataset, *MODEL.get_inference_tensor_names(), args.logdir, 1)
+                # cfg.TRAIN.BATCH_SIZE_PER_GPU)
                 for dataset in cfg.DATA.VAL
             ])
         else:
             callbacks.extend([
-                EvalCallback(dataset, *MODEL.get_inference_tensor_names(), args.logdir, 1) #cfg.TRAIN.BATCH_SIZE_PER_GPU)
+                EvalCallback(dataset, *MODEL.get_inference_tensor_names(), args.logdir, 1)
+                # cfg.TRAIN.BATCH_SIZE_PER_GPU)
                 for dataset in cfg.DATA.VAL
             ])
 
         if not is_horovod:
             callbacks.append(GPUUtilizationTracker())
 
-        callbacks.append(ThroughputTracker(cfg.TRAIN.BATCH_SIZE_PER_GPU*cfg.TRAIN.NUM_GPUS,
+        callbacks.append(ThroughputTracker(cfg.TRAIN.BATCH_SIZE_PER_GPU * cfg.TRAIN.NUM_GPUS,
                                            args.images_per_epoch,
                                            trigger_every_n_steps=args.throughput_log_freq,
                                            log_fn=logger.info))
@@ -387,7 +437,8 @@ if __name__ == '__main__':
             if hvd.rank() == 0:
                 callbacks.append(EnableCallbackIf(
                     GraphProfiler(dump_tracing=True, dump_event=True),
-                    lambda self: self.trainer.global_step >= args.tfprof_start_step and self.trainer.global_step <= args.tfprof_end_step))
+                    lambda
+                        self: self.trainer.global_step >= args.tfprof_start_step and self.trainer.global_step <= args.tfprof_end_step))
 
         if is_horovod and hvd.rank() > 0:
             session_init = None
@@ -397,16 +448,15 @@ if __name__ == '__main__':
             else:
                 session_init = get_model_loader(cfg.BACKBONE.WEIGHTS) if cfg.BACKBONE.WEIGHTS else None
 
-
         traincfg = TrainConfig(
             model=MODEL,
             data=QueueInput(train_dataflow),
             callbacks=callbacks,
             extra_callbacks=[
-               MovingAverageSummary(),
-               ProgressBar(),
-               MergeAllSummaries(period=250),
-               RunUpdateOps()
+                MovingAverageSummary(),
+                ProgressBar(),
+                MergeAllSummaries(period=250),
+                RunUpdateOps()
             ],
             steps_per_epoch=steps_per_epoch,
             max_epoch=max_epoch,
