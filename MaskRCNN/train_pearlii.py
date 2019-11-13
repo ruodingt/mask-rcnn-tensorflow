@@ -25,7 +25,7 @@ from tensorpack.utils import logger
 
 from dataset import DetectionDataset
 from config import finalize_configs, config as cfg
-from data_pearlii import get_eval_dataflow, get_train_dataflow, get_batch_train_dataflow
+from data import get_eval_dataflow, get_train_dataflow, get_batch_train_dataflow
 from eval import DetectionResult, predict_image, multithread_predict_dataflow, EvalCallback, AsyncEvalCallback
 from viz import draw_annotation, draw_final_outputs, draw_predictions, draw_proposal_recall
 from performance import ThroughputTracker, humanize_float
@@ -259,15 +259,21 @@ def set_config_default():
                                      coco_dir='data/coco_format')
     _latest = data_load.latest()
     latest_coco = next(_latest)
-    print('Backbone ---', cfg.BACKBONE.WEIGHTS)
-    input('Continue?')
+    # print('Backbone ---', cfg.BACKBONE.WEIGHTS)
+    # input('Continue?')
     # curl -O http://models.tensorpack.com/FasterRCNN/ImageNet-R50-AlignPadding.npz
-    cfg.BACKBONE.WEIGHTS ='/data/pretrained-models/ImageNet-R50-AlignPadding.npz'
+    cfg.BACKBONE.WEIGHTS =os.path.join(cfg.DATA.BASEDIR, 'pretrained-models/ImageNet-R50-AlignPadding.npz')
     cfg.DATA.TRAIN = latest_coco['train']
+    cfg.DATA.VAL = latest_coco['eval']
     # cfg.DATA.EEEEE = latest_coco['train']
-    raise ('CNT tmr set TENSORPACK_FP16=1')
+    os.environ["TENSORPACK_FP16"] = "1"
+    cfg.TRAIN.BATCH_SIZE_PER_GPU = 4
+    cfg.TRAIN.EVAL_PERIOD = 1
+    cfg.DATA.NUM_CATEGORY = 1
+    #
+    cfg.TRAIN.IMAGES_PER_EPOCH = 10
 
-    print(latest_coco)
+    print("latest_coco:\n", latest_coco)
 
 
 if __name__ == '__main__':
@@ -278,7 +284,7 @@ if __name__ == '__main__':
     start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--load', help='load a model for evaluation or training. Can overwrite BACKBONE.WEIGHTS')
-    parser.add_argument('--logdir', help='log directory', default='train_log/maskrcnn')
+    parser.add_argument('--logdir', help='log directory', default='train_log/maskrcnn2')
     parser.add_argument('--visualize', action='store_true', help='visualize intermediate results')
     parser.add_argument('--evaluate', help="Run evaluation. "
                                            "This argument is the path to the output json evaluation file")
@@ -295,9 +301,11 @@ if __name__ == '__main__':
     parser.add_argument('--throughput_log_freq',
                         help="In perf investigation mode, code will print throughput after every throughput_log_freq steps as well as after every epoch",
                         type=int, default=100)
-    parser.add_argument('--images_per_epoch',
-                        help="Number of images in an epoch. = images_per_steps * steps_per_epoch (differs slightly from the total number of images).",
-                        type=int, default=120000)
+
+    # TODO; this arg has been moved to config.py
+    # parser.add_argument('--images_per_epoch',
+    #                     help="Number of images in an epoch. = images_per_steps * steps_per_epoch (differs slightly from the total number of images).",
+    #                     type=int, default=120000)
 
     parser.add_argument('--tfprof', help="Enable tf profiler", action="store_true")
     parser.add_argument('--tfprof_start_step', help="Step to enable tf profiling", type=int, default=15005)
@@ -315,10 +323,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.config:
         cfg.update_args(args.config)
-    print(args.fp16)
-    input('continue?')
+    print('args.fp16 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>', args.fp16)
+    # input('continue?')
     MODEL = ResNetFPNModel(args.fp16)
-    DetectionDataset()  # initialize the config with information from our dataset
+    # exit()
+
+    # TODO: this Detect dataset is never used?
+    # DetectionDataset()  # initialize the config with information from our dataset
 
     if args.visualize or args.evaluate or args.predict:
         assert tf.test.is_gpu_available()
@@ -368,7 +379,7 @@ if __name__ == '__main__':
             np.random.seed(cfg.TRAIN.SEED)
 
         images_per_step = cfg.TRAIN.NUM_GPUS * cfg.TRAIN.BATCH_SIZE_PER_GPU
-        steps_per_epoch = args.images_per_epoch // images_per_step
+        steps_per_epoch = cfg.TRAIN.IMAGES_PER_EPOCH // images_per_step
         batch_size_lr_factor = images_per_step  # The LR is defined for bs=1 and then scaled linearly with the batch size
         base_lr_adjusted_for_bs = cfg.TRAIN.BASE_LR * batch_size_lr_factor
 
@@ -418,6 +429,7 @@ if __name__ == '__main__':
                 for dataset in cfg.DATA.VAL
             ])
         else:
+            # input('cfg.DATA.VAL{}, continue?'.format(cfg.DATA.VAL))
             callbacks.extend([
                 EvalCallback(dataset, *MODEL.get_inference_tensor_names(), args.logdir, 1)
                 # cfg.TRAIN.BATCH_SIZE_PER_GPU)
@@ -428,7 +440,7 @@ if __name__ == '__main__':
             callbacks.append(GPUUtilizationTracker())
 
         callbacks.append(ThroughputTracker(cfg.TRAIN.BATCH_SIZE_PER_GPU * cfg.TRAIN.NUM_GPUS,
-                                           args.images_per_epoch,
+                                           cfg.TRAIN.IMAGES_PER_EPOCH,
                                            trigger_every_n_steps=args.throughput_log_freq,
                                            log_fn=logger.info))
 

@@ -263,7 +263,7 @@ if __name__ == '__main__':
     MODEL = ResNetFPNModel(args.fp16)
     DetectionDataset()  # initialize the config with information from our dataset
 
-
+    exit()
 
     if args.visualize or args.evaluate or args.predict:
         assert tf.test.is_gpu_available()

@@ -23,6 +23,7 @@ class DataFromListOfDict(RNGDataFlow):
     def __iter__(self):
         if self._shuffle:
             self.rng.shuffle(self._lst)
+        # input('self._keys, {}'.format(self._keys))
         for dic in self._lst:
             dp = [dic[k] for k in self._keys]
             yield dp

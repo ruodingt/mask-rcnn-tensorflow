@@ -33,8 +33,8 @@ class COCODetection(object):
     """
 
     # 80 names for COCO
-    class_names = [
-        "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"]  # noqa
+    # class_names = [
+    #     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"]  # noqa
 
     def __init__(self, basedir, name):
         self.name = name
@@ -210,9 +210,10 @@ class DetectionDataset(object):
         This function is responsible for setting the dataset-specific
         attributes in both cfg and self.
         """
-        self.num_category = cfg.DATA.NUM_CATEGORY = len(COCODetection.class_names)
-        self.num_classes = self.num_category + 1
-        self.class_names = cfg.DATA.CLASS_NAMES = ["BG"] + COCODetection.class_names
+        # TODO: it looks really wierd
+        # self.num_category = cfg.DATA.NUM_CATEGORY = len(COCODetection.class_names)
+        # self.num_classes = self.num_category + 1
+        # self.class_names = cfg.DATA.CLASS_NAMES = ["BG"] + COCODetection.class_names
 
     def load_training_roidbs(self, names):
         """
