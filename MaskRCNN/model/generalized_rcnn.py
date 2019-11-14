@@ -359,7 +359,7 @@ class ResNetFPNModel(DetectionModel):
                 mask_logits = maskrcnn_head_func(
                         'maskrcnn', roi_feature_maskrcnn, cfg.DATA.NUM_CATEGORY, seed_gen=seed_gen, fp16=self.fp16)   # Num_fg_boxes x num_category x (H_roi_mask*2) x (W_roi_mask*2)
 
-                input('cfg.DATA.NUM_CATEGORY={}, okay?'.format(cfg.DATA.NUM_CATEGORY))
+                # input('cfg.DATA.NUM_CATEGORY={}, okay?'.format(cfg.DATA.NUM_CATEGORY))
                 per_image_target_masks_for_fg = []
                 per_image_fg_labels = []
                 for i in range(cfg.TRAIN.BATCH_SIZE_PER_GPU):

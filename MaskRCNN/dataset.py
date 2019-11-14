@@ -72,6 +72,8 @@ class COCODetection(object):
             for k in range(6):
                 ret[f'mAP({iou_type})/' + fields[k]] = 0.0
             return ret
+
+        # FIXME: cco.dataset contains None type and may cause issue
         self.coco.createIndex(use_ext=True)
         cocoDt = self.coco.loadRes(json_file, use_ext=True)
         cocoEval = COCOeval(self.coco, cocoDt, iou_type, use_ext=True)
@@ -278,13 +280,13 @@ class DetectionDataset(object):
         Returns:
             dict: the evaluation results.
         """
-        continuous_id_to_COCO_id = {v: k for k, v in COCODetection.COCO_id_to_category_id.items()}
+        # continuous_id_to_COCO_id = {v: k for k, v in COCODetection.COCO_id_to_category_id.items()}
         coco_results = {}
         coco_results['bbox'] = []
         coco_results['segm'] = []
         for res in results:
             # convert to COCO's incontinuous category id
-            res['category_id'] = continuous_id_to_COCO_id[res['category_id']]
+            # res['category_id'] = continuous_id_to_COCO_id[res['category_id']]
             # COCO expects results in xywh format
             box = res['bbox']
             box[2] -= box[0]
