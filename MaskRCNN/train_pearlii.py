@@ -262,16 +262,18 @@ def set_config_default():
     # print('Backbone ---', cfg.BACKBONE.WEIGHTS)
     # input('Continue?')
     # curl -O http://models.tensorpack.com/FasterRCNN/ImageNet-R50-AlignPadding.npz
-    cfg.BACKBONE.WEIGHTS =os.path.join(cfg.DATA.BASEDIR, 'pretrained-models/ImageNet-R50-AlignPadding.npz')
+    cfg.BACKBONE.WEIGHTS = os.path.join(cfg.DATA.BASEDIR, 'pretrained-models/ImageNet-R50-AlignPadding.npz')
     cfg.DATA.TRAIN = latest_coco['train']
-    cfg.DATA.VAL = latest_coco['eval']
+    cfg.DATA.VAL = latest_coco['train']
     # cfg.DATA.EEEEE = latest_coco['train']
     os.environ["TENSORPACK_FP16"] = "1"
     cfg.TRAIN.BATCH_SIZE_PER_GPU = 4
-    cfg.TRAIN.EVAL_PERIOD = 2
+    cfg.TRAIN.EVAL_PERIOD = 1
     cfg.DATA.NUM_CATEGORY = 1
+
+    cfg.TRAIN.WEIGHT_DECAY = 1e-5
     #
-    cfg.TRAIN.IMAGES_PER_EPOCH = 10000
+    cfg.TRAIN.IMAGES_PER_EPOCH = 2000
 
     print("latest_coco:\n", latest_coco)
 
@@ -284,7 +286,7 @@ if __name__ == '__main__':
     start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--load', help='load a model for evaluation or training. Can overwrite BACKBONE.WEIGHTS')
-    parser.add_argument('--logdir', help='log directory', default='train_log/maskrcnn_3b')
+    parser.add_argument('--logdir', help='log directory', default='train_log/maskrcnn_3c')
     parser.add_argument('--visualize', action='store_true', help='visualize intermediate results')
     parser.add_argument('--evaluate', help="Run evaluation. "
                                            "This argument is the path to the output json evaluation file")
@@ -424,14 +426,16 @@ if __name__ == '__main__':
 
         if args.async_eval:
             callbacks.extend([
-                AsyncEvalCallback(dataset, *MODEL.get_inference_tensor_names(), args.logdir, 1)
+                AsyncEvalCallback(dataset, *MODEL.get_inference_tensor_names(),
+                                  args.logdir+'-eval', 1)
                 # cfg.TRAIN.BATCH_SIZE_PER_GPU)
                 for dataset in cfg.DATA.VAL
             ])
         else:
             # input('cfg.DATA.VAL{}, continue?'.format(cfg.DATA.VAL))
             callbacks.extend([
-                EvalCallback(dataset, *MODEL.get_inference_tensor_names(), args.logdir, 1)
+                EvalCallback(dataset, *MODEL.get_inference_tensor_names(),
+                             args.logdir+'-eval', 1)
                 # cfg.TRAIN.BATCH_SIZE_PER_GPU)
                 for dataset in cfg.DATA.VAL
             ])

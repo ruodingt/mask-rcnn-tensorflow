@@ -410,7 +410,8 @@ class EvalCallback(Callback):
         logger.info("[EvalCallback] Will evaluate every {} epochs".format(eval_period))
 
     def _eval(self):
-        logdir = self._output_dir
+        eval_logdir = self._output_dir
+        os.makedirs(eval_logdir, exist_ok=True)
         if cfg.TRAINER == 'replicated':
             all_results = multithread_predict_dataflow(self.dataflows, self.predictors)
         else:
@@ -428,7 +429,7 @@ class EvalCallback(Callback):
                     all_results.extend(item)
 
         output_file = os.path.join(
-            logdir, '{}-outputs{}'.format(os.path.splitext(os.path.basename(self._eval_dataset))[0], self.global_step))
+            eval_logdir, '{}-outputs{}'.format(os.path.splitext(os.path.basename(self._eval_dataset))[0], self.global_step))
 
         scores = DetectionDataset().eval_or_save_inference_results(
             all_results, self._eval_dataset, output_file)

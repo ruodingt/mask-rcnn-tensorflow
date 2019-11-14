@@ -86,6 +86,16 @@ class DetectionModel(ModelDesc):
             opt = GradientClipOptimizer(opt, cfg.TRAIN.GRADIENT_CLIP)
         return opt
 
+    def collect_variables(self):
+        """
+        Assign `self.g_vars` to the parameters under scope `g_scope`,
+        and same with `self.d_vars`.
+        """
+        # self.g_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, g_scope)
+        # assert self.g_vars
+        # self.d_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, d_scope)
+        # assert self.d_vars
+
     def get_inference_tensor_names(self):
         """
         Returns two lists of tensor names to be used to create an inference callable.
@@ -100,6 +110,12 @@ class DetectionModel(ModelDesc):
         if cfg.MODE_MASK:
             out.append('output/masks')
         return ['images', 'orig_image_dims'], out
+
+    # def backbone(self, image, seed_gen):
+    #     raise NotImplementedError()
+    #
+    # def rpn(self):
+    #     raise NotImplementedError()
 
     def build_graph(self, *inputs):
         inputs = dict(zip(self.input_names, inputs))
@@ -118,7 +134,8 @@ class DetectionModel(ModelDesc):
 
         if self.training:
             wd_cost = regularize_cost('.*/W', l2_regularizer(cfg.TRAIN.WEIGHT_DECAY), name='wd_cost')
-            total_cost = tf.add_n(rpn_losses + head_losses + [wd_cost], 'total_cost')
+            # FIXME: put [wd_cost] back later
+            total_cost = tf.add_n(rpn_losses + head_losses, 'total_cost')
             #total_cost = print_runtime_tensor('COST ', total_cost, prefix=f'rank{hvd.rank()}')
             add_moving_summary(total_cost, wd_cost)
             return total_cost
