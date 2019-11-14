@@ -60,7 +60,7 @@ def _scale_box(box, scale):
     scaled_box[3] = y_c + h_half
     return scaled_box
 
-@jit
+# @jit
 def _paste_mask(box, mask, shape):
     """
     Args:
@@ -124,13 +124,21 @@ def predict_image(img, model_func):
     resizer = CustomResize(cfg.PREPROC.TEST_SHORT_EDGE_SIZE, cfg.PREPROC.MAX_SIZE)
     resized_img = resizer.augment(img)
     scale = np.sqrt(resized_img.shape[0] * 1.0 / img.shape[0] * resized_img.shape[1] / img.shape[1])
-    boxes, probs, labels, *masks = model_func(resized_img)
+    # TODO somthing's changed here
+    #   boxes, probs, labels, *masks = model_func(resized_img)
+    # FIXME: Channel first format for img shape?
+    # boxes, probs, labels, *masks = model_func(resized_img[None, ], np.array(img.shape)[None, ])
+    batch_index, boxes, probs, labels, *masks = model_func(resized_img[None,], np.array(img.shape)[None,])
     boxes = boxes / scale
     # boxes are already clipped inside the graph, but after the floating point scaling, this may not be true any more.
     boxes = clip_boxes(boxes, orig_shape)
 
     if masks:
+        # print('boxes:   ', boxes.shape)
+        # print('masks:   ', masks[0].shape)
+        # zipped_box_mask = list(zip(boxes, masks[0]))
         # has mask
+        assert boxes.shape[0] == masks[0].shape[0]
         full_masks = [_paste_mask(box, mask, orig_shape)
                       for box, mask in zip(boxes, masks[0])]
         masks = full_masks
@@ -140,6 +148,7 @@ def predict_image(img, model_func):
 
     results = [DetectionResult(*args) for args in zip(boxes, probs, labels, masks)]
     return results
+
 
 def predict_image_batch(img_batch, model_func, resized_sizes, scales, orig_sizes):
     """
@@ -419,11 +428,12 @@ class EvalCallback(Callback):
                     all_results.extend(item)
 
         output_file = os.path.join(
-            logdir, '{}-outputs{}'.format(self._eval_dataset, self.global_step))
+            logdir, '{}-outputs{}'.format(os.path.splitext(os.path.basename(self._eval_dataset))[0], self.global_step))
 
         scores = DetectionDataset().eval_or_save_inference_results(
             all_results, self._eval_dataset, output_file)
         for k, v in scores.items():
+            print(k, v)
             self.trainer.monitors.put_scalar(k, v)
 
     def _trigger_epoch(self):
