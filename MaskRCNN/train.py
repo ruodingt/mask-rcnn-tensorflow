@@ -21,7 +21,7 @@ from tensorpack import *
 from tensorpack.tfutils.common import get_tf_version_tuple
 
 
-from dataset import DetectionDataset
+from dataset import DetectionDatasetInterface
 from config import finalize_configs, config as cfg
 from data import get_eval_dataflow, get_train_dataflow, get_batch_train_dataflow
 from eval import DetectionResult, predict_image, multithread_predict_dataflow, EvalCallback, AsyncEvalCallback
@@ -100,7 +100,7 @@ def do_evaluate(pred_config, output_file):
             for k in range(num_gpu)]
         all_results = multithread_predict_dataflow(dataflows, graph_funcs)
         output = output_file + '-' + dataset
-        DetectionDataset().eval_or_save_inference_results(all_results, dataset, output)
+        DetectionDatasetInterface().eval_or_save_inference_results(all_results, dataset, output)
 
 
 def do_predict(pred_func, input_file):
@@ -261,7 +261,7 @@ if __name__ == '__main__':
         cfg.update_args(args.config)
 
     MODEL = ResNetFPNModel(args.fp16)
-    DetectionDataset()  # initialize the config with information from our dataset
+    DetectionDatasetInterface()  # initialize the config with information from our dataset
 
 
 

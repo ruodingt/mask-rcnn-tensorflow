@@ -16,8 +16,11 @@ from tensorpack.utils.timer import timed_operation
 
 from config import config as cfg
 
-__all__ = ['COCODetection', 'DetectionDataset']
+__all__ = ['COCODetection', 'DetectionDatasetInterface']
 
+
+class CVDataset(object):
+    pass
 
 class COCODetection(object):
     # handle the weird (but standard) split of train and val
@@ -189,7 +192,7 @@ class COCODetection(object):
         return ret
 
 
-class DetectionDataset(object):
+class DetectionDatasetInterface(object):
     """
     A singleton to load datasets, evaluate results, and provide metadata.
 

@@ -25,7 +25,7 @@ from tensorpack.utils.utils import get_tqdm
 
 from common import CustomResize, clip_boxes
 from data import get_eval_dataflow, get_batched_eval_dataflow
-from dataset import DetectionDataset
+from dataset import DetectionDatasetInterface
 from config import config as cfg
 
 try:
@@ -422,7 +422,7 @@ class EvalCallback(Callback):
         output_file = os.path.join(
             logdir, '{}-outputs{}'.format(self._eval_dataset, self.global_step))
 
-        scores = DetectionDataset().eval_or_save_inference_results(
+        scores = DetectionDatasetInterface().eval_or_save_inference_results(
             all_results, self._eval_dataset, output_file)
         for k, v in scores.items():
             self.trainer.monitors.put_scalar(k, v)
@@ -512,7 +512,7 @@ class AsyncEvalCallback(Callback):
         def background_coco(all_results):
             output_file = os.path.join(
                 logdir, '{}-outputs{}'.format(self._eval_dataset, self.global_step))
-            scores = DetectionDataset().eval_or_save_inference_results(
+            scores = DetectionDatasetInterface().eval_or_save_inference_results(
                 all_results, self._eval_dataset, output_file)
             cfg.TRAIN.SHOULD_STOP = scores['mAP(bbox)/IoU=0.5:0.95'] >= cfg.TEST.BOX_TARGET and scores['mAP(segm)/IoU=0.5:0.95'] >= cfg.TEST.MASK_TARGET
             for k, v in scores.items():

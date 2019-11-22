@@ -19,7 +19,7 @@ from common import (
     CustomResize, DataFromListOfDict, box_to_point8,
     filter_boxes_inside_shape, point8_to_box, segmentation_to_mask, np_iou)
 from config import config as cfg
-from dataset import DetectionDataset
+from dataset import DetectionDatasetInterface
 from utils.generate_anchors import generate_anchors
 from utils.np_box_ops import area as np_area, ioa as np_ioa
 
@@ -113,7 +113,7 @@ def print_class_histogram(roidbs):
     Args:
         roidbs (list[dict]): the same format as the output of `load_training_roidbs`.
     """
-    dataset = DetectionDataset()
+    dataset = DetectionDatasetInterface()
     hist_bins = np.arange(dataset.num_classes + 1)
 
     # Histogram of ground-truth objects
@@ -385,7 +385,7 @@ def get_train_dataflow():
     If MODE_MASK, gt_masks: (N, h, w)
     """
 
-    roidbs = DetectionDataset().load_training_roidbs(cfg.DATA.TRAIN)
+    roidbs = DetectionDatasetInterface().load_training_roidbs(cfg.DATA.TRAIN)
     print_class_histogram(roidbs)
 
     # Valid training images should have at least one fg box.
@@ -496,7 +496,7 @@ def get_batch_train_dataflow(batch_size):
     If MODE_MASK, gt_masks: (BS, maxNumAnchors, h, w)
     """
     print("In train dataflow")
-    roidbs = DetectionDataset().load_training_roidbs(cfg.DATA.TRAIN)
+    roidbs = DetectionDatasetInterface().load_training_roidbs(cfg.DATA.TRAIN)
     print("Done loading roidbs")
 
     # print_class_histogram(roidbs)
@@ -766,7 +766,7 @@ def get_eval_dataflow(name, shard=0, num_shards=1):
         name (str): name of the dataset to evaluate
         shard, num_shards: to get subset of evaluation data
     """
-    roidbs = DetectionDataset().load_inference_roidbs(name)
+    roidbs = DetectionDatasetInterface().load_inference_roidbs(name)
 
     num_imgs = len(roidbs)
     img_per_shard = num_imgs // num_shards
@@ -790,7 +790,7 @@ def get_batched_eval_dataflow(name, shard=0, num_shards=1, batch_size=1):
         name (str): name of the dataset to evaluate
         shard, num_shards: to get subset of evaluation data
     """
-    roidbs = DetectionDataset().load_inference_roidbs(name)
+    roidbs = DetectionDatasetInterface().load_inference_roidbs(name)
 
     num_imgs = len(roidbs)
     img_per_shard = num_imgs // num_shards
