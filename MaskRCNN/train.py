@@ -21,7 +21,7 @@ from tensorpack import *
 from tensorpack.tfutils.common import get_tf_version_tuple
 
 
-from dataset import DetectionDatasetInterface
+from dataset_aws import DetectionDatasetInterface
 from config import finalize_configs, config as cfg
 from data import get_eval_dataflow, get_train_dataflow, get_batch_train_dataflow
 from eval import DetectionResult, predict_image, multithread_predict_dataflow, EvalCallback, AsyncEvalCallback

@@ -25,7 +25,7 @@ from tensorpack.utils.utils import get_tqdm
 
 from common import CustomResize, clip_boxes
 from data import get_eval_dataflow, get_batched_eval_dataflow
-from dataset import DetectionDatasetInterface
+from dataset_aws import DetectionDatasetInterface
 from config import config as cfg
 
 try:

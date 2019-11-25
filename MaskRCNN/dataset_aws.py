@@ -16,13 +16,42 @@ from tensorpack.utils.timer import timed_operation
 
 from config import config as cfg
 
-__all__ = ['COCODetection', 'DetectionDatasetInterface']
+__all__ = ['COCODetectionTask', 'DetectionDatasetInterface']
 
 
 class CVDataset(object):
     pass
 
-class COCODetection(object):
+
+class Task(object):
+    def __init__(self, basedir, name):
+        self.basedir = basedir
+        self.name = name
+        return
+
+    @classmethod
+    def load_many(cls, basedir, names, add_gt=True, add_mask=False):
+        """
+        Load and merges several instance files together.
+
+        Returns the same format as :meth:`COCODetection.load`.
+        """
+        raise Exception('CNT here, let\'s check what is cls?')
+
+        if not isinstance(names, (list, tuple)):
+            names = [names]
+
+        ret = []
+        for n in names:
+            coco = cls(basedir, n)
+            ret.extend(coco.load(add_gt, add_mask=add_mask))
+        return ret
+
+    def load(self, add_gt=True, add_mask=False):
+        raise NotImplementedError
+
+
+class COCODetectionTask(object):
     # handle the weird (but standard) split of train and val
     _INSTANCE_TO_BASEDIR = {
         'valminusminival2014': 'val2014',
@@ -176,20 +205,6 @@ class COCODetection(object):
             # also required to be float32
             img['segmentation'] = all_segm
 
-    @staticmethod
-    def load_many(basedir, names, add_gt=True, add_mask=False):
-        """
-        Load and merges several instance files together.
-
-        Returns the same format as :meth:`COCODetection.load`.
-        """
-        if not isinstance(names, (list, tuple)):
-            names = [names]
-        ret = []
-        for n in names:
-            coco = COCODetection(basedir, n)
-            ret.extend(coco.load(add_gt, add_mask=add_mask))
-        return ret
 
 
 class DetectionDatasetInterface(object):
@@ -203,9 +218,9 @@ class DetectionDatasetInterface(object):
         This function is responsible for setting the dataset-specific
         attributes in both cfg and self.
         """
-        self.num_category = cfg.DATA.NUM_CATEGORY = len(COCODetection.class_names)
+        self.num_category = cfg.DATA.NUM_CATEGORY = len(COCODetectionTask.class_names)
         self.num_classes = self.num_category + 1
-        self.class_names = cfg.DATA.CLASS_NAMES = ["BG"] + COCODetection.class_names
+        self.class_names = cfg.DATA.CLASS_NAMES = ["BG"] + COCODetectionTask.class_names
 
     def load_training_roidbs(self, names):
         """
@@ -233,7 +248,7 @@ class DetectionDatasetInterface(object):
 
             Include this field only if training Mask R-CNN.
         """
-        return COCODetection.load_many(
+        return COCODetectionTask.load_many(
             cfg.DATA.BASEDIR, cfg.DATA.TRAIN, add_gt=True, add_mask=cfg.MODE_MASK)
 
     def load_inference_roidbs(self, name):
@@ -250,7 +265,7 @@ class DetectionDatasetInterface(object):
             file_name (str): full path to the image
             id (str): an id for the image. The inference results will be stored with this id.
         """
-        return COCODetection.load_many(cfg.DATA.BASEDIR, name, add_gt=False)
+        return COCODetectionTask.load_many(cfg.DATA.BASEDIR, name, add_gt=False)
 
     def eval_or_save_inference_results(self, results, dataset, output=None):
         """
@@ -270,7 +285,7 @@ class DetectionDatasetInterface(object):
         Returns:
             dict: the evaluation results.
         """
-        continuous_id_to_COCO_id = {v: k for k, v in COCODetection.COCO_id_to_category_id.items()}
+        continuous_id_to_COCO_id = {v: k for k, v in COCODetectionTask.COCO_id_to_category_id.items()}
         coco_results = {}
         coco_results['bbox'] = []
         coco_results['segm'] = []
@@ -299,7 +314,7 @@ class DetectionDatasetInterface(object):
 
         ret = {}
         assert output is not None and len(output) > 0, "COCO evaluation requires an output file!"
-        coco = COCODetection(cfg.DATA.BASEDIR, dataset)
+        coco = COCODetectionTask(cfg.DATA.BASEDIR, dataset)
 
         with open(output+'box.json', 'w') as f:
             json.dump(coco_results["bbox"], f)
@@ -321,6 +336,6 @@ class DetectionDatasetInterface(object):
 
 
 if __name__ == '__main__':
-    c = COCODetection(cfg.DATA.BASEDIR, 'train2014')
+    c = COCODetectionTask(cfg.DATA.BASEDIR, 'train2014')
     gt_boxes = c.load(add_gt=True, add_mask=True)
     print("#Images:", len(gt_boxes))

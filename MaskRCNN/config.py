@@ -82,6 +82,7 @@ _C.MODE_MASK = True        # FasterRCNN or MaskRCNN
 _C.MODE_FPN = True
 
 # dataset -----------------------
+_C.DATA.TASK = 'coco'
 _C.DATA.BASEDIR = '/path/to/your/DATA/DIR'
 # All TRAIN dataset will be concatenated for training.
 _C.DATA.TRAIN = ['train2017']   # i.e. trainval35k, AKA train2017
